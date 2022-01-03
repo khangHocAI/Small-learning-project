@@ -1,0 +1,71 @@
+<!-- Limitation:
+won't work for region where always people
+fixed background -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <link rel="stylesheet" type="text/css" href="styles.css"/>
+    
+	<title></title>
+</head>
+<body>
+    <video id="video" width="500" src="" muted loop controls></video>
+    <canvas id="output-canvas" width="500" height="450"></canvas>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.0"></script>
+    <script>
+        let video, c_out, c_tmp, context_out, context_tmp;
+        const bodyPixConfig = {
+            architecture : 'MobileNetV1',
+            outputStride : 16,
+            multiplier : 1,
+            quanBytes : 4
+        }
+        const segmentationConfig = {
+            interalResolution: 'full',
+            segmentationThreshold: 0.01,
+            scoreThreshold: 0.01
+        }
+        video = document.getElementById("video");
+        video.onloadeddata = function(){
+            bodyPix.load(bodyPixConfig).then((m)=>{
+                model = m;
+                init();
+            });
+        }
+        function init(){
+           
+            c_out = document.getElementById("output-canvas");
+            context_out = c_out.getContext("2d");
+            c_tmp = document.createElement("canvas");
+            c_tmp.setAttribute("width", 500);
+            c_tmp.setAttribute("height", 450);
+            context_tmp = c_tmp.getContext("2d");
+            video.play();
+            computeFrame();
+        }
+        function computeFrame(){
+            context_tmp.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+            let frame = context_tmp.getImageData(0,0,video.videoWidth, video.videoHeight);
+            model.segmentPerson(c_tmp, segmentationConfig).then((segmentation)=>{
+                let out_image = context_out.getImageData(0,0,video.videoWidth, video.videoHeight);
+                for(let i=0; i<video.videoWidth; i++){
+                    for(let j=0; j<video.videoHeight; j++){
+                        let n = i + j*video.videoWidth;
+                        if (segmentation.data[n] == 0){
+                            out_image.data[n*4] = frame.data[n*4];
+                            out_image.data[n*4+1] = frame.data[n*4+1];
+                            out_image.data[n*4+2] = frame.data[n*4+2];
+                            out_image.data[n*4+3] = frame.data[n*4+3];
+                        }
+                    }
+                }
+                context_out.putImageData(out_image, 0, 0);
+                setTimeout(computeFrame, 0);
+            });
+            
+        }
+    </script>
+</body>
+</html>
